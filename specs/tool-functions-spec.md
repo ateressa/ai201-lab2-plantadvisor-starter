@@ -53,14 +53,16 @@ normalized = plant_name.strip().lower()
 
 #### Search order
 
-Search in this order: direct key → display name → aliases. Keys are the fastest
+Search in this order: direct key → display name → scientific name → aliases. Keys are the fastest
 lookup (O(1) dict access), so check those first. Display names are the next most
-likely match for clean user input. Aliases are the broadest net, so they go last.
+likely match for clean user input. Scientific names are a strong secondary match.
+Aliases are the broadest net, so they go last.
 
 ```
 1. Direct key match: normalized in _plant_db
 2. Display name match: plant["display_name"].lower() == normalized
-3. Alias match: normalized in [alias.lower() for alias in plant["aliases"]]
+3. Scientific name match: plant["scientific_name"].lower() == normalized
+4. Alias match: normalized in [alias.lower() for alias in plant["aliases"]]
 ```
 
 ---
@@ -69,9 +71,7 @@ likely match for clean user input. Aliases are the broadest net, so they go last
 
 *Aliases are stored as a list of strings. How will you check if the normalized input matches any alias in the list? Write your approach in pseudocode or plain English.*
 
-```
-[your answer here]
-```
+Normalize each alias the same way as the user input, then check whether the normalized input is in the normalized alias list. In code, this can be a simple `any(...)` check during a scan, or a precomputed inverted index that maps each normalized alias to the plant slug for faster lookups.
 
 ---
 
@@ -79,9 +79,7 @@ likely match for clean user input. Aliases are the broadest net, so they go last
 
 *When a plant isn't found, the agent will read your message and use it to decide what to tell the user. Write the exact string you'll return — make it useful to the agent, not just to a human reading logs.*
 
-```
-[your answer here]
-```
+`No plant match found for '{normalized_name}'. Try a common name, display name, scientific name, or alias.`
 
 ---
 
@@ -90,19 +88,13 @@ likely match for clean user input. Aliases are the broadest net, so they go last
 *Fill this in after implementing and running the app.*
 
 **Test: does `"devil's ivy"` return the pothos entry?**
-```
-[yes / no — if no, describe what happened]
-```
+yes
 
 **Test: does `"SNAKE PLANT"` return the snake plant entry?**
-```
-[yes / no — if no, describe what happened]
-```
+yes
 
 **One edge case you discovered while implementing:**
-```
-[your answer here]
-```
+Whitespace-only input normalizes to an empty string, so it falls through to the not-found response with an empty `name` field.
 
 ---
 

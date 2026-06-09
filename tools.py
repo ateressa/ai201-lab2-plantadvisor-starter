@@ -11,6 +11,27 @@ with open(os.path.join(DATA_PATH, "plants.json"), encoding="utf-8") as f:
 with open(os.path.join(DATA_PATH, "seasons.json"), encoding="utf-8") as f:
     _season_data = json.load(f)
 
+
+def _normalize_name(name: str) -> str:
+    return name.strip().casefold()
+
+
+_normalized_plant_index = {}
+for slug, plant in _plant_db.items():
+    normalized_slug = _normalize_name(slug)
+    _normalized_plant_index.setdefault(normalized_slug, slug)
+
+    display_name = plant.get("display_name", "")
+    if display_name:
+        _normalized_plant_index.setdefault(_normalize_name(display_name), slug)
+
+    scientific_name = plant.get("scientific_name", "")
+    if scientific_name:
+        _normalized_plant_index.setdefault(_normalize_name(scientific_name), slug)
+
+    for alias in plant.get("aliases", []):
+        _normalized_plant_index.setdefault(_normalize_name(alias), slug)
+
 # Maps calendar months to seasons for auto-detection.
 _MONTH_TO_SEASON = {
     12: "winter", 1: "winter", 2: "winter",
@@ -31,12 +52,13 @@ def lookup_plant(plant_name: str) -> dict:
 
     The plant database (_plant_db) is a dict where keys are lowercase slugs like
     "pothos", "snake_plant", "fiddle_leaf_fig". Each plant also has a "display_name"
-    field and an "aliases" list with common alternate names.
+    field, a "scientific_name" field, and an "aliases" list with common alternate names.
 
     Your implementation should handle all three:
       1. Direct key match (e.g., "pothos" → finds "pothos")
       2. Display name match (e.g., "Pothos" → finds "pothos")
-      3. Alias match (e.g., "devil's ivy" → finds "pothos")
+            3. Scientific name match (e.g., "Epipremnum aureum" → finds "pothos")
+            4. Alias match (e.g., "devil's ivy" → finds "pothos")
 
     All matching should be case-insensitive. Strip whitespace from the input.
 
@@ -44,7 +66,7 @@ def lookup_plant(plant_name: str) -> dict:
       {"found": True, "plant": <the full plant dict>}
 
     Return format when not found:
-      {"found": False, "name": <original input>, "message": <helpful string>}
+            {"found": False, "name": <normalized input>, "message": <helpful string>}
 
     The message in the not-found case matters — the agent will use it to decide
     what to tell the user. Your spec has a dedicated field for this — think about
@@ -52,10 +74,22 @@ def lookup_plant(plant_name: str) -> dict:
 
     Before writing code, complete the lookup_plant section of specs/tool-functions-spec.md.
     """
+    normalized_name = _normalize_name(plant_name)
+    slug = _normalized_plant_index.get(normalized_name)
+
+    if slug:
+        return {
+            "found": True,
+            "plant": _plant_db[slug],
+        }
+
     return {
         "found": False,
-        "name": plant_name,
-        "message": "Plant lookup not yet implemented. Complete Milestone 1.",
+        "name": normalized_name,
+        "message": (
+            f"No plant match found for '{normalized_name}'. "
+            "Try a common name, display name, scientific name, or alias."
+        ),
     }
 
 
