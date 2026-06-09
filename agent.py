@@ -96,6 +96,22 @@ def dispatch_tool(tool_name: str, tool_args: dict) -> str:
     return json.dumps(result)
 
 
+def _append_history_messages(messages: list, history: list) -> None:
+    for item in history:
+        if isinstance(item, dict):
+            role = item.get("role")
+            content = item.get("content")
+            if role in {"user", "assistant"} and content:
+                messages.append({"role": role, "content": content})
+            continue
+
+        if isinstance(item, (list, tuple)) and len(item) == 2:
+            user_msg, assistant_msg = item
+            messages.append({"role": "user", "content": user_msg})
+            if assistant_msg:
+                messages.append({"role": "assistant", "content": assistant_msg})
+
+
 # ──────────────────────────────────────────────
 # Agent loop
 # ──────────────────────────────────────────────
@@ -128,4 +144,49 @@ def run_agent(user_message: str, history: list) -> str:
 
     Before writing code, complete specs/agent-loop-spec.md.
     """
-    return "🌱 Agent not yet implemented. Complete Milestone 2 to activate the Plant Advisor."
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    _append_history_messages(messages, history)
+
+    messages.append({"role": "user", "content": user_message})
+
+    response = None
+
+    for _ in range(MAX_TOOL_ROUNDS):
+        response = _client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=messages,
+            tools=TOOL_DEFINITIONS,
+            tool_choice="auto",
+        )
+
+        assistant_message = response.choices[0].message
+
+        if not assistant_message.tool_calls:
+            final_content = assistant_message.content
+            if final_content:
+                return final_content
+            return "Sorry, I couldn't generate a response just now. Please try again."
+
+        messages.append(assistant_message)
+
+        for tool_call in assistant_message.tool_calls:
+            tool_name = tool_call.function.name
+            tool_args = json.loads(tool_call.function.arguments)
+            tool_result = dispatch_tool(tool_name, tool_args)
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": tool_result,
+            })
+
+    if response and response.choices:
+        final_content = response.choices[0].message.content
+        if final_content:
+            return final_content
+
+    return (
+        "Sorry, I couldn't finish that request after several tool calls. "
+        "Please try again with a simpler question."
+    )

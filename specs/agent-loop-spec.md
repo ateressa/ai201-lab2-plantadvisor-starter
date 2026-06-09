@@ -121,9 +121,9 @@ for tool_call in assistant_message.tool_calls:
 
 *The loop should stop when: (a) the LLM returns a response with no tool calls, OR (b) the MAX_TOOL_ROUNDS limit is reached. Describe how you will detect each condition and what you will return in each case.*
 
-```
-[your answer here]
-```
+If `assistant_message.tool_calls` is falsy, stop immediately because the LLM has produced a final answer. Return that response's text content. If tool calls are present, execute them, append their results, and continue to the next round.
+
+If the loop reaches `MAX_TOOL_ROUNDS`, stop even if the LLM is still requesting tools. Return a user-readable fallback message such as: `Sorry, I couldn't finish that request after several tool calls. Please try again with a simpler question.`
 
 ---
 
@@ -131,9 +131,7 @@ for tool_call in assistant_message.tool_calls:
 
 *Once the loop exits because there are no more tool calls, how do you extract the text content from the response object? What field holds the string you should return?*
 
-```
-[your answer here]
-```
+Use `response.choices[0].message.content`. The assistant message is in `choices[0].message`, and its `content` field is the final text string to return.
 
 ---
 
@@ -144,20 +142,20 @@ for tool_call in assistant_message.tool_calls:
 **Trace of a working agent turn (what tools were called and in what order):**
 
 ```
-Query: "How should I care for my calathea?"
-Round 1 tool call: [tool name, args]
-Round 2 tool call: [tool name, args] (if any)
-Final response: [brief description]
+Query: "How do I care for pothos?"
+Round 1 tool call: lookup_plant({"plant_name": "pothos"})
+Round 2 tool call: none
+Final response: returned the LLM's final text after the tool result was added back into messages
 ```
 
 **What happens when you ask about a plant that isn't in the database?**
 
 ```
-[describe the behavior you observed]
+lookup_plant() returns a structured not-found response with the normalized name and a helpful message. If the model keeps asking for tools, the loop repeats until MAX_TOOL_ROUNDS, then returns the fallback message instead of hanging forever.
 ```
 
 **One thing about the tool call API that surprised you:**
 
 ```
-[your answer here]
+The assistant message has to be appended as the full SDK message object before any tool result messages; otherwise the tool_call_id chain breaks.
 ```
